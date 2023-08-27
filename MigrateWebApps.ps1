@@ -76,7 +76,7 @@ foreach($site in $tempsites)
 write-output "Done. Pausing for 10 minutes."
 Start-Sleep -Seconds 600
 
-#RESTORE SITES
+#RESTORING SITE
 foreach($site in $tempsites)
 {
     if (!($site.ServerFarmId.EndsWith($appserviceplantemp))) {
@@ -89,14 +89,24 @@ foreach($site in $tempsites)
 
     $siteorgname = $site.Name.Split("TEMP-")[1]
 
-    write-output "$($site.Name) - Restoring clone to original site"
-    New-AzWebApp -ResourceGroupName $rgnorg -Name $siteorgname -Location $region -AppServicePlan $appserviceplannew -SourceWebApp $site
-
-    Write-Output "$($site.Name) - Restoring network integration"
-    $sitenew = Get-AzResource -ResourceType Microsoft.Web/sites -ResourceGroupName $rgnorg -ResourceName $siteorgname
-    $sitenew.Properties.virtualNetworkSubnetId = $subnetResourceId
-    $sitenew | Set-AzResource -Force
+    try {
+      if (Get-AzResource -ResourceType Microsoft.Web/sites -ResourceGroupName $rgnorg -ResourceName $siteorgname -ErrorAction SilentlyContinue) {
+        Write-Output "$($site.Name) - Site already restored"
+      } else {
+        write-output "$($site.Name) - Restoring clone to original site"
+        New-AzWebApp -ResourceGroupName $rgnorg -Name $siteorgname -Location $region -AppServicePlan $appserviceplannew -SourceWebApp $site
+      }
+      
+      Write-Output "$($site.Name) - Restoring network integration"
+      $sitenew = Get-AzResource -ResourceType Microsoft.Web/sites -ResourceGroupName $rgnorg -ResourceName $siteorgname
+      $sitenew.Properties.virtualNetworkSubnetId = $subnetResourceId
+      $sitenew | Set-AzResource -Force
+    }
+    catch {
+      throw "$($site.Name) - error restoring site"
+    }
 }
+
 
 
 write-output "Done. Pausing for 10 minutes."
